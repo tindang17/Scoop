@@ -1,9 +1,11 @@
+
 // database is let instead of const to allow us to modify it in test.js
 let database = {
   users: {},
   articles: {},
   comments: {},
-  nextArticleId: 1
+  nextArticleId: 1,
+  nextCommentId: 1
 };
 
 const routes = {
@@ -36,11 +38,22 @@ const routes = {
     'DELETE': deleteComment
   },
   '/comments/:id/upvote': {
-    'PUT': upvoteComment
+    'PUT': votingHandler
   },
   '/comments/:id/downvote': {
-    'PUT': downvoteComment
+    'PUT': votingHandler
   }
+};
+
+// handle yaml file
+function loadDatabase() {
+  let read = require('read-data');
+  return read.sync('./database.yml');
+};
+
+function saveDatabase() {
+  let yaml = require('write-yaml');
+  return yaml.sync('./database.yml', database);
 };
 
 //USER LOGIC
@@ -111,7 +124,7 @@ function getArticles(url, request) {
 }
 
 function getArticle(url, request) {
-  const id = Number(url.split('/').filter(segment => segment)[1]);
+  const id = returnParam(url);
   const article = database.articles[id];
   const response = {};
 
@@ -159,7 +172,7 @@ function createArticle(url, request) {
 }
 
 function updateArticle(url, request) {
-  const id = Number(url.split('/').filter(segment => segment)[1]);
+  const id = returnParam(url);
   const savedArticle = database.articles[id];
   const requestArticle = request.body && request.body.article;
   const response = {};
@@ -180,7 +193,7 @@ function updateArticle(url, request) {
 }
 
 function deleteArticle(url, request) {
-  const id = Number(url.split('/').filter(segment => segment)[1]);
+  const id = returnParam(url);
   const savedArticle = database.articles[id];
   const response = {};
 
@@ -203,7 +216,7 @@ function deleteArticle(url, request) {
 }
 
 function upvoteArticle(url, request) {
-  const id = Number(url.split('/').filter(segment => segment)[1]);
+  const id = returnParam(url);
   const username = request.body && request.body.username;
   let savedArticle = database.articles[id];
   const response = {};
@@ -221,7 +234,7 @@ function upvoteArticle(url, request) {
 }
 
 function downvoteArticle(url, request) {
-  const id = Number(url.split('/').filter(segment => segment)[1]);
+  const id = returnParam(url);
   const username = request.body && request.body.username;
   let savedArticle = database.articles[id];
   const response = {};
@@ -241,7 +254,104 @@ function downvoteArticle(url, request) {
 //COMMENT LOGIC
 
 function createComment(url, request) {
-  const requestComment = request.body && request.
+  const requestComment = request.body && request.body.comment;
+  const response = {};
+  if (requestComment && requestComment.body && database.articles[requestComment.articleId] && database.users[requestComment.username]) {
+
+    const comment = {
+      id: database.nextCommentId++,
+      body: requestComment.body,
+      username: requestComment.username,
+      articleId: requestComment.articleId,
+      upvotedBy: [],
+      downvotedBy: []
+    };
+
+    database.comments[comment.id] = comment;
+    database.articles[comment.articleId].commentIds.push(comment.id);
+    database.users[comment.username].commentIds.push(comment.id);
+
+    response.body = {comment};
+    response.status = 201;
+  } else {
+    response.status = 400;
+  }
+
+  return response;
+}
+
+function updateComment(url, request) {
+  const updateRequest = request.body && request.body.comment;
+  const response = {};
+  const id = returnParam(url)
+  const savedComment = database.comments[id];
+  if (!id || !updateRequest || !updateRequest.body) {
+    response.status = 400;
+  } else if (!savedComment) {
+    response.status = 404;
+  } else {
+    database.comments[id].body = updateRequest.body;
+    const comment = database.comments[id];
+    response.body = { comment };
+    response.status = 200;
+  }
+  return response;
+};
+function deleteComment(url, request) {
+  const id = returnParam(url);
+  const response = {};
+  const savedComment = database.comments[id];
+  if (!savedComment) {
+    response.status = 404;
+  } else {
+    removeCommentId(id, 'articles', 'articleId');
+    removeCommentId(id, 'users', 'username');
+
+    database.comments[id] = null;
+    response.status = 204;
+  }
+  return response;
+};
+
+function removeCommentId(id, databaseKey, databaseSubKey) {
+  const item = database[databaseKey][database.comments[id][databaseSubKey]];
+  const position = item.commentIds.indexOf(id);
+  return item.commentIds.splice(position, 1);
+}
+
+function votingHandler(url, request) {
+  const id = returnParam(url);
+  const votingType = url.split('/').filter(segment => segment)[2];
+  const response = {};
+  const votingRequest = request.body;
+  const comment = database.comments[id];
+  if (!id || !comment || !votingRequest || !votingRequest.username) {
+    response.status = 400;
+  } else if (!database.users[votingRequest.username]) {
+    response.status = 400;
+  } else {
+    const { username } = votingRequest;
+
+    switch (votingType) {
+      case 'upvote':
+        const savedCommentUpvote = upvote(comment, username);
+        response.body = { comment: savedCommentUpvote };
+        response.status = 200;
+        break;
+      case 'downvote':
+        const savedCommentDownvote = downvote(comment, username);
+        response.body = { comment: savedCommentDownvote };
+        response.status = 200;
+        break;
+    }
+  }
+  return response;
+};
+
+
+function returnParam(url) {
+  const id = Number(url.split('/').filter(segment => segment)[1]);
+  return id;
 }
 
 //VOTING HELPER FUNCTION

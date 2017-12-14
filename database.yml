@@ -1,0 +1,39 @@
+users:
+  asda:
+    username: asda
+    articleIds:
+      - 1
+    commentIds: []
+  asdasd:
+    username: asdasd
+    articleIds:
+      - 2
+    commentIds: []
+  adasd:
+    username: adasd
+    articleIds: []
+    commentIds: []
+articles:
+  '1':
+    id: 1
+    title: asdasd
+    url: asdasd.com
+    username: asda
+    commentIds: []
+    upvotedBy:
+      - asdasd
+      - adasd
+    downvotedBy: []
+  '2':
+    id: 2
+    title: hohoho
+    url: dasdasd
+    username: asdasd
+    commentIds: []
+    upvotedBy:
+      - asdasd
+      - adasd
+    downvotedBy: []
+comments: {}
+nextArticleId: 3
+nextCommentId: 1
